@@ -8,6 +8,8 @@ library(caret)
 library(caretEnsemble)
 library(magrittr)
 library(doParallel)
+library(purrr)
+`%notin%` <- Negate(`%in%`)
 
 ##Create Awards Ref Table
 awards <- Lahman::AwardsPlayers %>%
@@ -198,6 +200,62 @@ append_GG <- function(.data) {
     dplyr::mutate(GG_Win = ifelse(GG_Win=='Y', 1, 0), GG_Win=as.numeric(GG_Win))
 }
 
+## Append Steroids
+append_steroids <- function(.data) {
+  
+  names <- c(
+    'Barry Bonds',
+    'Bret Boone',
+    'Kevin Brown',
+    'Ken Caminiti',
+    'Jose Canseco',
+    'Roger Clemens',
+    'Lenny Dykstra',
+    'Chuck Finley',
+    'Eric Gagne',
+    'Jason Giambi',
+    'Troy Glaus',
+    'Wally Joyner',
+    'David Justice',
+    'Chuck Knoblauch',
+    'Mark McGwire',
+    'Magglio Ordonez',
+    'Rafael Palmeiro',
+    'Andy Pettitte',
+    'Manny Ramirez',
+    'Brian Roberts',
+    'Ivan Rodriguez',
+    'Benito Santiago',
+    'Gary Sheffield',
+    'Sammy Sosa',
+    'Miguel Tejada',
+    'Mo Vaughn',
+    'Matt Williams'
+  )
+  
+  ROID <- Lahman::People %>%
+    mutate(
+      full_name = paste0(nameFirst, ' ', nameLast),
+      birthdate = paste0(birthMonth,'/',birthDay,'/',birthYear),
+      filt_name_bday = paste0(full_name,birthdate)
+    ) %>%
+    filter(full_name %in% names ) %>%
+    filter(filt_name_bday != "Kevin Brown3/14/1965") %>%
+    filter(filt_name_bday != "Kevin Brown4/21/1973") %>%
+    filter(filt_name_bday != "Matt Williams7/25/1959") %>%
+    filter(filt_name_bday != "Matt Williams4/12/1971") %>%
+    mutate(
+      TookSteroids = 1
+    ) %>%
+    select(playerID, TookSteroids)
+  
+  ROID <- .data %>%
+    merge(ROID, by=c("playerID"), all.x=TRUE) %>%
+    tidyr::replace_na(list(TookSteroids=0)) %>%
+    dplyr::mutate(GG_Win = ifelse(TookSteroids==1, 1, 0), TookSteroids=as.numeric(TookSteroids))
+  
+}
+
 # Append Triple Crown Winners
 append_TC <- function(.data) {
   
@@ -312,7 +370,7 @@ final_game_max='2022-01-01') {
                     "PA", "R", "RBI", "SB", "SF", "SH", "SO", "TB",
                     "wwoba", "X1B", "X2B", "X3B", "Age", "WAA", "WAR", "WAR_off", "WAR_def")
   war_and_fip <- c("PA", "BB", "SO", "WAA", "WAA_rank", "WAR", "WAR_off", "WAR_def")
-  grit <- c("AllStar", "AllStarStart", "WSWin", "MVPWin", "MVPShare")
+  grit <- c("AllStar", "AllStarStart", "WSWin", "MVPWin", "MVPShare", "SS_Win", "GG_Win", "TC_Win", "TookSteroids")
   
   if (is.null(LIST_OF_STATS)) {
     LIST_OF_STATS <- c(war_and_fip, grit)
@@ -370,8 +428,34 @@ final_game_max='2022-01-01') {
     }
   }
   
-  # ineligible
-  kkg %>% filter(playerID!='rosepe01', playerID!='jacksjo01')
+  # ineligible + steroid adjustment + Median WAR/WAA Calc
+  
+  #print(kkg[267,])
+  
+  med_df <- kkg %>%
+    filter(PA_1 > 0) %>%
+    select(-starts_with(c("WAR_off_", "WAR_def_"))) %>%
+    rowwise() %>%
+    mutate(Season_Vec = pmap(across(starts_with("PA_")), ~ c(...) %>% discard(~ . == 0)),
+           Seasons = length(Season_Vec),
+           WAR_Vec  = list(map(seq_len(Seasons), ~ get(paste0("WAR_", .)))),
+           WAA_Vec = list(map(seq_len(Seasons), ~ get(paste0("WAA_", .)))),
+           Median_WAA = median(unlist(WAA_Vec)),
+           Median_WAR = median(unlist(WAR_Vec)),
+           Mean_WAR = mean(unlist(WAR_Vec)),
+           Mean_WAA = mean(unlist(WAA_Vec))
+           ) %>%
+    select(playerID, Seasons, Median_WAA, Median_WAR, Mean_WAA, Mean_WAR)
+
+  
+  
+  kkg %>%
+    left_join(med_df, by = 'playerID') %>%
+    filter(playerID!='rosepe01', playerID!='jacksjo01') %>%
+    mutate(
+      TookSteroids = pmax(!!!select(., starts_with("TookSteroids_")), na.rm = TRUE)
+    ) %>%
+    select(-starts_with(c("TookSteroids_")))
   
 }
 
@@ -380,7 +464,8 @@ get_aggregated_fit_df <-
            keys_to_aggregate=c('^AllStar_',
                                '^AllStarStart_',
                                '^WSWin_', '^MVPWin_',
-                               '^MVPShare_'),
+                               '^MVPShare_',
+                               "^SS_Win_", "^GG_Win_", "^TC_Win_", "^TookSteroids_"),
            keys_to_keep=c("^playerID$",
                           "^inducted$",
                           "^POS$",
@@ -413,7 +498,7 @@ get_aggregated_fit_df <-
   }
 
 convert_to_factors <- function(dfX,
-                                 factors_list=c("^AllStar", "^MVPWin", "^WSWin")) {
+                                 factors_list=c("^AllStar", "^MVPWin", "^WSWin", "^SS_Win", "^GG_Win", "^TC_Win", "^TookSteroids")) {
   
   cc <- unlist(lapply(factors_list, grep, names(dfX)))
   for (i in seq_along(cc)) {
@@ -438,15 +523,16 @@ p_get_fit_data <- function(.data,
                     "H", "ER", "HR", "BB", "SO", "BAOpp", "ERA", "BFP","GF","R",
                     "RA9", "Age", "WAA", "WAR"
                     )
-  war_and_fip <- c("IPouts", "BB", "SO", "W","BAOpp", "L", "WAA", "WAA_rank", "WAR")
-  grit <- c("AllStar", "AllStarStart", "WSWin", "MVPWin", "MVPShare", "CYWin", "CYShare", "RelOYWin")
+  war_and_fip <- c("IPouts", "BB", "SO", "W","BAOpp", "L", "SV", "RA9", "WAA", "WAA_rank", "WAR", "Eff_WAR")
+  grit <- c("AllStar", "AllStarStart", "WSWin", "MVPWin", "MVPShare", "CYWin", "CYShare", "RelOYWin", "PTC_Win", "GG_Win", "TookSteroids")
   
   if (is.null(P_LIST_OF_STATS)) {
     P_LIST_OF_STATS <- c(war_and_fip,  grit)
   }
   
   kk <- .data %>%
-    dplyr::filter(finalGame>=final_game_min, finalGame<=final_game_max)
+    dplyr::filter(finalGame>=final_game_min, finalGame<=final_game_max) %>%
+    dplyr::mutate(Eff_WAR = (WAR / IPouts)*100)
   
   kk$ORDER_KEY <- kk[[ORDER_KEY]]
   
@@ -497,9 +583,31 @@ p_get_fit_data <- function(.data,
     }
   }
   
-  # ineligible
-  kkg %>% filter(playerID!='rosepe01', playerID!='jacksjo01')
+  # Mean + Median Creation
+  med_df <- kkg %>%
+    filter(IPouts_1 > 0) %>%
+    rowwise() %>%
+    mutate(Season_Vec = pmap(across(starts_with("IPouts_")), ~ c(...) %>% discard(~ . == 0)),
+           Seasons = length(Season_Vec),
+           WAR_Vec  = list(map(seq_len(Seasons), ~ get(paste0("WAR_", .)))),
+           WAA_Vec = list(map(seq_len(Seasons), ~ get(paste0("WAA_", .)))),
+           WAR_IP_Vec = list(map(seq_len(Seasons), ~ get(paste0("Eff_WAR_", .)))),
+           Median_WAA = median(unlist(WAA_Vec)),
+           Median_WAR = median(unlist(WAR_Vec)),
+           Median_Eff_WAR = median(unlist(WAR_IP_Vec)),
+           Mean_WAR = mean(unlist(WAR_Vec)),
+           Mean_WAA = mean(unlist(WAA_Vec)),
+           Mean_Eff_WAR = mean(unlist(WAR_IP_Vec))
+    ) %>%
+    select(playerID, Seasons, Median_WAA, Median_WAR, Median_Eff_WAR, Mean_WAA, Mean_WAR, Mean_Eff_WAR)
   
+  kkg %>%
+    left_join(med_df, by = 'playerID') %>%
+    filter(playerID!='rosepe01', playerID!='jacksjo01') %>%
+    mutate(
+      TookSteroids = pmax(!!!select(., starts_with("TookSteroids_")), na.rm = TRUE)
+    ) %>%
+    select(-starts_with(c("TookSteroids_")))
 }
 
 p_get_aggregated_fit_df <-
@@ -507,7 +615,7 @@ p_get_aggregated_fit_df <-
            keys_to_aggregate=c('^AllStar_',
                                '^AllStarStart_',
                                '^WSWin_', '^MVPWin_','^MVPShare_',
-                               '^CYWin_', '^CYShare_', '^RelOYWin_'),
+                               '^CYWin_', '^CYShare_', '^RelOYWin_', '^PTC_Win_', "^GG_Win_", "^TookSteroids_"),
            keys_to_keep=c("^playerID$",
                           "^inducted$",
                           "^POS$",
@@ -557,7 +665,7 @@ p_append_br_war <- function(.data, war) {
 }
 
 p_convert_to_factors <- function(dfX,
-                               factors_list=c("^AllStar", "^MVPWin", "^WSWin", "^CYWin", "^RelOYWin")) {
+                               factors_list=c("^AllStar", "^MVPWin", "^WSWin", "^CYWin", "^RelOYWin", '^PTC_Win_', "^GG_Win_", "^TookSteroids_")) {
   
   cc <- unlist(lapply(factors_list, grep, names(dfX)))
   for (i in seq_along(cc)) {
