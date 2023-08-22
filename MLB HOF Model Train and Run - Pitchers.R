@@ -30,7 +30,7 @@ p_fit_df_test <- rbind(
     filter(IPouts_1>=10 & playerID %in% ROID_IDS)
 )
 
-head(p_fit_df_train, 1) %>% print.data.frame()
+head(p_fit_df_train %>% filter(playerID == 'riverma01'), 1) %>% print.data.frame()
 
 
 ## Weight Model For Steroids ##
@@ -99,5 +99,24 @@ p_results_df_test %>%
   print.data.frame()
 
 p_imp_scores <- varImp(p_xgbFit1)$importance
+p_imp_scores["SV_1", "Overall"]
 
-p_imp_scores["Median_WAR", "Overall"]
+
+p_results_df_test %>%
+  select(playerID, HOF_Prob) %>%
+  rename(
+    New_HOF_Prob = HOF_Prob
+  ) %>%
+  left_join(old_p_results_df_test %>% select(playerID, HOF_Prob) %>% rename(oldest_HOF_Prob = HOF_Prob), by = 'playerID') %>%
+  left_join(somewhat_old_p_results_df_test %>% select(playerID, HOF_Prob) %>% rename(old_HOF_Prob = HOF_Prob), by = 'playerID') %>%
+  mutate(
+    test_1_difference = New_HOF_Prob - oldest_HOF_Prob,
+    test_1_abs_diff = abs(test_1_difference)
+  ) %>%
+  arrange(desc(test_1_abs_diff)) %>%
+  head(100) %>%
+  print.data.frame()
+
+old_p_results_df_test %>%
+  head(10) %>%
+  print.data.frame()
