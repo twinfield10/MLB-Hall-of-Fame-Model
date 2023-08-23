@@ -1,5 +1,6 @@
 ## Build Helper Functions ##
-
+library(mlbplotR)
+library(gt)
 ## Color Scales ##
 CareerWAR_Col_Func <- function(x) {
   ifelse(x < -100, "#ff0000",
@@ -154,10 +155,6 @@ BAT_TM <- Lahman::Batting %>%
   select(playerID, Primary_Team, tm_cnt, starts_with("Team_"))
 #### END SET UP ####
 
-#results_df_test %>% filter(playerID == 'arenano01') %>% select(starts_with("WAR"))
-#colnames(results_df_test)
-#valid_team_names(remove_league_info = FALSE)
-
 
 ## Plot Eligible Players and Probability ##
 eligible_retired <- function(type = 'BAT',
@@ -204,9 +201,8 @@ eligible_retired <- function(type = 'BAT',
     mutate(Active = if_else(finalGame >= "2022-01-01", 'Y', 'N'),
            Deb_Age=as.numeric(substr(debut, 1, 4))-birthYear,
            Ret_Age=as.numeric(substr(finalGame, 1, 4))-birthYear,
-           Seasons = Ret_Age - Deb_Age,
            Age=2022-birthYear,
-           WARPerYR=Mean_WAR/Seasons,
+           WARPerYR = WAR/Seasons,
            Active = case_when(
              nameFirst == 'Cole' & nameLast == 'Hamels' ~ 'N',
              nameFirst == 'Anibal' & nameLast == 'Sanchez' ~ 'N',
@@ -251,7 +247,7 @@ eligible_retired <- function(type = 'BAT',
              nameFirst == 'Jake' & nameLast == 'McGee' ~ 1,
              TRUE ~ 0
            ),
-           Eligible = if_else(finalGame <= "2018-01-01" & Seasons >= 10 & Active == 'N', 'Y', 'N'),
+           Eligible = if_else(finalGame <= "2017-01-01" & Seasons >= 10 & Active == 'N', 'Y', 'N'),
            Inducted = inducted,
            Name = paste0(nameFirst, " ", nameLast),
            HOF_Prob = round(HOF_Prob, digits = 4)
@@ -503,7 +499,7 @@ eligible_retired <- function(type = 'BAT',
 return(gt_obj)  
 
 }
-eligible_retired(type = 'PIT',
+eligible_retired(type = 'BAT',
                  Roids = 0,
                  active_ply = 'N',
                  #sub_type = c('3B'),
