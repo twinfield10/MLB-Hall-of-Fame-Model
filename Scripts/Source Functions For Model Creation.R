@@ -115,11 +115,27 @@ hofers <- Lahman::HallOfFame %>%
 #' append batting war
 append_br_war <- function(.data, war) {
   tmp <- war %>%
-    dplyr::select(player_ID, WAA, WAR, WAR_off, WAR_def, year_ID, stint_ID)
+    dplyr::select(player_ID, WAA, WAR, WAR_off, WAR_def, OPS_plus, year_ID, stint_ID)
   
   tmp <- tmp %>%
     combine_war_stints() %>%
     dplyr::rename(bbrefID=player_ID, yearID=year_ID)
+  
+  jaws_df <- tmp %>%
+    group_by(playerID) %>%
+    mutate(WAR=as.numeric(WAR)) %>%
+    arrange(-WAR) %>%
+    dplyr::mutate(war_rank=row_number(),
+                  ipeak=as.integer(war_rank<=7),
+                  nyear=max(war_rank)) %>%
+    group_by(playerID, votedBy, POS) %>%
+    dplyr::summarise(last_year=max(yearID),
+                     nyear=mean(nyear),
+                     cwar=sum(WAR),
+                     pwar=sum(ipeak*WAR),
+                     jaws=0.5*(cwar+pwar)) %>%
+    ungroup() %>%
+    select(playerID, jaws)
   
   tmp <- tmp %>%
     group_by(yearID) %>%
@@ -127,10 +143,10 @@ append_br_war <- function(.data, war) {
     mutate(WAA_rank=row_number()) %>%
     ungroup()
   
-  .data %>% merge(tmp)
+  .data %>% merge(tmp) %>% left_join(jaws_df, by = 'playerID')
 }
 
-
+### AWARDS ###
 #' append MVPs
 append_mvps <- function(.data) {
   
@@ -200,62 +216,6 @@ append_GG <- function(.data) {
     dplyr::mutate(GG_Win = ifelse(GG_Win=='Y', 1, 0), GG_Win=as.numeric(GG_Win))
 }
 
-## Append Steroids
-append_steroids <- function(.data) {
-  
-  names <- c(
-    'Barry Bonds',
-    'Bret Boone',
-    'Kevin Brown',
-    'Ken Caminiti',
-    'Jose Canseco',
-    'Roger Clemens',
-    'Lenny Dykstra',
-    'Chuck Finley',
-    'Eric Gagne',
-    'Jason Giambi',
-    'Troy Glaus',
-    'Wally Joyner',
-    'David Justice',
-    'Chuck Knoblauch',
-    'Mark McGwire',
-    'Magglio Ordonez',
-    'Rafael Palmeiro',
-    'Andy Pettitte',
-    'Manny Ramirez',
-    'Brian Roberts',
-    'Ivan Rodriguez',
-    'Benito Santiago',
-    'Gary Sheffield',
-    'Sammy Sosa',
-    'Miguel Tejada',
-    'Mo Vaughn',
-    'Matt Williams'
-  )
-  
-  ROID <- Lahman::People %>%
-    mutate(
-      full_name = paste0(nameFirst, ' ', nameLast),
-      birthdate = paste0(birthMonth,'/',birthDay,'/',birthYear),
-      filt_name_bday = paste0(full_name,birthdate)
-    ) %>%
-    filter(full_name %in% names ) %>%
-    filter(filt_name_bday != "Kevin Brown3/14/1965") %>%
-    filter(filt_name_bday != "Kevin Brown4/21/1973") %>%
-    filter(filt_name_bday != "Matt Williams7/25/1959") %>%
-    filter(filt_name_bday != "Matt Williams4/12/1971") %>%
-    mutate(
-      TookSteroids = 1
-    ) %>%
-    select(playerID, TookSteroids)
-  
-  ROID <- .data %>%
-    merge(ROID, by=c("playerID"), all.x=TRUE) %>%
-    tidyr::replace_na(list(TookSteroids=0)) %>%
-    dplyr::mutate(GG_Win = ifelse(TookSteroids==1, 1, 0), TookSteroids=as.numeric(TookSteroids))
-  
-}
-
 # Append Triple Crown Winners
 append_TC <- function(.data) {
   
@@ -270,6 +230,7 @@ append_TC <- function(.data) {
     dplyr::mutate(TC_Win = ifelse(TC_Win=='Y', 1, 0), TC_Win=as.numeric(TC_Win))
 }
 
+# Append Pitching Triple Crown Winners
 append_PTC <- function(.data) {
   
   TC <- Lahman::AwardsPlayers %>%
@@ -297,10 +258,9 @@ append_SS <- function(.data) {
     dplyr::mutate(SS_Win = ifelse(SS_Win=='Y', 1, 0), SS_Win=as.numeric(SS_Win))
 }
 
+### OTHER FEATURES ###
 
-
-
-#' append WS wins
+# append ASG Nominations + Starts
 append_all_star <- function(.data) {
   
   all_stars <- Lahman::AllstarFull %>%
@@ -317,8 +277,7 @@ append_all_star <- function(.data) {
     )
 }
 
-
-#' append WS wins
+# Append WS wins
 append_ws_wins <- function(.data) {
   
   all_players <- Lahman::Appearances %>%
@@ -338,7 +297,48 @@ append_ws_wins <- function(.data) {
     tidyr::replace_na(list(WSWin='N')) %>%
     mutate(WSWin=as.numeric(ifelse(WSWin=='Y', 1, 0))) }
 
-#' append WS wins
+# Append Pennant Wins
+append_pen_wins <- function(.data) {
+  
+  all_players <- Lahman::Appearances %>%
+    group_by(playerID, yearID) %>%
+    mutate(rr=row_number()) %>%
+    filter(rr==max(rr)) %>%
+    select(playerID, yearID, teamID)
+  
+  pen_winners <- Lahman::Teams %>%
+    filter(LgWin == 'Y') %>%
+    select(yearID, teamID, LgWin)
+  
+  pen_players <- merge(all_players, pen_winners, by=c("yearID", "teamID")) %>%
+    select(playerID, yearID, LgWin)
+  
+  ee = merge(.data, pen_players, by=c("yearID", "playerID"), all.x=TRUE) %>%
+    tidyr::replace_na(list(LgWin='N')) %>%
+    mutate(PenWin=as.numeric(ifelse(LgWin=='Y', 1, 0))) %>%
+    select(-LgWin)}
+
+# Append Division Wins
+append_div_wins <- function(.data) {
+  
+  all_players <- Lahman::Appearances %>%
+    group_by(playerID, yearID) %>%
+    mutate(rr=row_number()) %>%
+    filter(rr==max(rr)) %>%
+    select(playerID, yearID, teamID)
+  
+  div_winners <- Lahman::Teams %>%
+    filter(DivWin == 'Y') %>%
+    select(yearID, teamID, DivWin)
+  
+  div_players <- merge(all_players, div_winners, by=c("yearID", "teamID")) %>%
+    select(playerID, yearID, DivWin)
+  
+  ee = merge(.data, div_players, by=c("yearID", "playerID"), all.x=TRUE) %>%
+    tidyr::replace_na(list(DivWin='N')) %>%
+    mutate(DivWin=as.numeric(ifelse(DivWin=='Y', 1, 0))) }
+
+# Append WAR Rank wins
 append_war_rank <- function(war_df) {
   war_df %>%
     group_by(playerID) %>%
@@ -347,6 +347,77 @@ append_war_rank <- function(war_df) {
     dplyr::mutate(war_rank=row_number()) %>%
     ungroup() %>% arrange(playerID, yearID) }
 
+# Append Steroids
+append_steroids <- function(.data) {
+  
+  names <- c(
+    'Barry Bonds',
+    'Bret Boone',
+    'Tim Beckham',
+    'Ervin Santana',
+    'Dee Gordon',
+    'Starling Marte',
+    'Fernando Tatis',
+    'Ryan Braun',
+    'Michael Pineda',
+    'Melky Cabrera',
+    'Bartolo Colon',
+    'Nelson Cruz',
+    'Paul Lo Duca',
+    'Robinson Cano',
+    'Kevin Brown',
+    'Ken Caminiti',
+    'Jose Canseco',
+    'Roger Clemens',
+    'Lenny Dykstra',
+    'Chuck Finley',
+    'Eric Gagne',
+    'Jason Giambi',
+    'Troy Glaus',
+    'Jose Guillen',
+    'Wally Joyner',
+    'David Justice',
+    'Chuck Knoblauch',
+    'Mark McGwire',
+    'Magglio Ordonez',
+    'Rafael Palmeiro',
+    'Andy Pettitte',
+    'Manny Ramirez',
+    'Brian Roberts',
+    'Alex Rodriguez',
+    'Benito Santiago',
+    'Gary Sheffield',
+    'Sammy Sosa',
+    'Miguel Tejada',
+    'Mo Vaughn',
+    'Matt Williams',
+    'Gregg Zaun'
+  )
+  
+  false_names <- c("Kevin Brown3/14/1965", "Kevin Brown4/21/1973",
+                   "Matt Williams7/25/1959", "Matt Williams4/12/1971",
+                   "Nelson Cruz9/13/1972", "Ryan Braun7/29/1980")
+  
+  ROID_RAW <- Lahman::People %>%
+    mutate(
+      full_name = paste0(nameFirst, ' ', nameLast),
+      birthdate = paste0(birthMonth,'/',birthDay,'/',birthYear),
+      filt_name_bday = paste0(full_name,birthdate)
+    ) %>%
+    filter(full_name %in% names & filt_name_bday %notin% false_names) %>%
+    mutate(
+      TookSteroids = 1
+    ) %>%
+    select(playerID, TookSteroids)
+  
+  ROID <- .data %>%
+    merge(ROID_RAW, by=c("playerID"), all.x=TRUE) %>%
+    tidyr::replace_na(list(TookSteroids=0)) %>%
+    dplyr::mutate(TookSteroids = ifelse(TookSteroids==1, 1, 0), TookSteroids=as.numeric(TookSteroids))
+  
+}
+
+# Filter By Year
 filter_by_years <- function(war_df, min_year=10) {
   war_df %>%
     group_by(playerID) %>%
@@ -356,8 +427,9 @@ filter_by_years <- function(war_df, min_year=10) {
     dplyr::select(-nyear)
 }
 
-#' fit data
-#' takes the top MAXYEAR seasons, ordered by ORDER_KEY and #' returns the value of LIST_OF_STATS. If less than MAXYEAR has been played, filled in with 0
+# Create Train and Test Data Sets -- BATTERS
+# takes the top MAXYEAR seasons, ordered by ORDER_KEY and #' returns the value of LIST_OF_STATS. If less than MAXYEAR has been played, filled in with 0
+### Default Key is WAA, but can change to YearID for potential time-series model?
 get_fit_data <- function(.data,
 MAXYEAR=20,
 LIST_OF_STATS=NULL,
@@ -368,8 +440,10 @@ final_game_max='2022-01-01') {
   kitchen_sink <- c("AB", "BB", "CS", "G", "GIDP",
                     "HBP", "HR", "IBB", "BR",
                     "PA", "R", "RBI", "SB", "SF", "SH", "SO", "TB",
-                    "wwoba", "X1B", "X2B", "X3B", "Age", "WAA", "WAR", "WAR_off", "WAR_def")
-  war_and_fip <- c("PA", "BB", "SO", "WAA", "WAA_rank", "WAR", "WAR_off", "WAR_def")
+                    "wwoba", "X1B", "X2B", "X3B", "Age", "WAA",
+                    "WAR", "WAR_off", "WAR_def",
+                    "jaws", "o_jaws", "d_jaws", "HOFM_Points", "C_HOFM_Points")
+  war_and_fip <- c("PA", "SO","BB", "WAA", "WAA_rank", "WAR", "WAR_off", "WAR_def", "jaws", "d_jaws", "HOFM_Points", "C_HOFM_Points")
   grit <- c("AllStar", "AllStarStart", "WSWin", "MVPWin", "MVPShare", "SS_Win", "GG_Win", "TC_Win", "TookSteroids")
   
   if (is.null(LIST_OF_STATS)) {
@@ -429,47 +503,36 @@ final_game_max='2022-01-01') {
   }
   
   # ineligible + steroid adjustment + Median WAR/WAA Calc
-  
-  #print(kkg[267,])
-  
   med_df <- kkg %>%
     filter(PA_1 > 0) %>%
     select(-starts_with(c("WAR_off_", "WAR_def_"))) %>%
     rowwise() %>%
     mutate(Season_Vec = pmap(across(starts_with("PA_")), ~ c(...) %>% discard(~ . == 0)),
-           Seasons = length(Season_Vec),
-           WAR_Vec  = list(map(seq_len(Seasons), ~ get(paste0("WAR_", .)))),
-           WAA_Vec = list(map(seq_len(Seasons), ~ get(paste0("WAA_", .)))),
-           Median_WAA = median(unlist(WAA_Vec)),
-           Median_WAR = median(unlist(WAR_Vec)),
-           Mean_WAR = mean(unlist(WAR_Vec)),
-           Mean_WAA = mean(unlist(WAA_Vec))
-           ) %>%
-    select(playerID, Seasons, Median_WAA, Median_WAR, Mean_WAA, Mean_WAR)
-
-  
+           Seasons = length(Season_Vec)
+    ) %>%
+    select(playerID, Seasons)
   
   kkg %>%
     left_join(med_df, by = 'playerID') %>%
     filter(playerID!='rosepe01', playerID!='jacksjo01') %>%
     mutate(
-      TookSteroids = pmax(!!!select(., starts_with("TookSteroids_")), na.rm = TRUE)
+      TookSteroids = pmax(!!!select(., starts_with("TookSteroids_")), na.rm = TRUE),
+      jaws = pmax(!!!select(., starts_with("jaws_")), na.rm = TRUE),
+      d_jaws = pmax(!!!select(., starts_with("d_jaws_")), na.rm = TRUE),
+      C_HOFM_Points = pmax(!!!select(., starts_with("C_HOFM_Points")), na.rm = TRUE)
     ) %>%
-    select(-starts_with(c("TookSteroids_")))
+    select(-starts_with(c("TookSteroids_", "jaws_", "o_jaws_", "d_jaws_", "C_HOFM_Points_")))
   
 }
 
+## Append Aggregated Data - Think I want to keep this just to Awards - No career WAA or WAR
 get_aggregated_fit_df <-
   function(fit_df,
            keys_to_aggregate=c('^AllStar_',
                                '^AllStarStart_',
                                '^WSWin_', '^MVPWin_',
-                               '^MVPShare_',
-                               "^SS_Win_", "^GG_Win_", "^TC_Win_", "^TookSteroids_"),
-           keys_to_keep=c("^playerID$",
-                          "^inducted$",
-                          "^POS$",
-                          "^WAR_[0-9]+$")) {
+                               "^SS_Win_", "^GG_Win_", "^TC_Win_", "^HOFM_Points_"),
+           keys_to_keep=c("^playerID$", "^C_HOFM_Points$")) {
     
     nn <- names(fit_df)
     i = 0
@@ -490,11 +553,64 @@ get_aggregated_fit_df <-
       dfX[[nk]] <- agg1
     }
     
-    k = '^WAR_'
-    cc = grep(k, names(dfX))
-    dfX$CWAR <- rowSums(dfX[,cc])
+    ## Post Season Agg - Potentially Add?
     
-    dfX
+    ## Post Season Stats ##
+    post <- Lahman::BattingPost %>%
+      select(-c(round, teamID, yearID, lgID)) %>%
+      group_by(playerID) %>%
+      dplyr::summarise(
+        G = sum(G),
+        AB = sum(AB),
+        BB = sum(BB),
+        R = sum(R),
+        H = sum(H),
+        X2B = sum(X2B),
+        X3B = sum(X3B),
+        HR = sum(HR),
+        RBI = sum(RBI),
+        WOBA = 0.7*BB +
+          0.9*(H-X2B-X3B-HR) +
+          1.25*X2B +
+          1.6*X3B +
+          2.0*HR,
+        TB = ((HR*4) + (X3B*3) + (X2B*2) + (H-X2B-X3B-HR)),
+        SLG = if_else(TB == 0, 0, TB/AB)
+      ) %>%
+      rename_with(~ paste0("Post_", .), -playerID) %>%
+      select(playerID, Post_G, Post_SLG, Post_RBI)
+    
+    #o = '^WAR_off'
+    #cc_o = grep(o, names(dfX))
+    #dfX$C_WAR_off <- rowSums(dfX[,cc_o])
+    
+    #d = '^WAR_def'
+    #cc_d = grep(d, names(dfX))
+    #dfX$C_WAR_def <- rowSums(dfX[,cc_d])
+    
+    #k = '^WAA_'
+    #cc_k = grep(k, names(dfX))
+    #dfX$C_WAA <- rowSums(dfX[,cc_k])
+    
+    #k = '^HOFM_Points_'
+    #cc_k = grep(k, names(dfX))
+    #dfX$HOFM_Points <- rowSums(dfX[,cc_k])
+
+    
+    dfX %>%
+      mutate(HOFM_Points = C_HOFM_Points + HOFMPoints) %>%
+      select(-HOFMPoints, -C_HOFM_Points)
+    
+    
+    
+    
+      #left_join(post, by = 'playerID') %>%
+      #mutate_at(vars(starts_with("Post_")), ~ifelse(is.na(.), 0, .)) %>%
+      #select(-starts_with(c("WAR_","WAA_"))) %>%
+      #mutate(
+      #  C_WAR = C_WAR_def + C_WAR_off
+      #) %>%
+      #rename_with(~ paste0("C_", .), -c(playerID, C_WAR, C_WAR_off, C_WAR_def, C_WAA))
   }
 
 convert_to_factors <- function(dfX,
@@ -521,18 +637,17 @@ p_get_fit_data <- function(.data,
   
   kitchen_sink <- c("IPouts", "GS", "G", "W", "L", "CG", "SHO", "SV",
                     "H", "ER", "HR", "BB", "SO", "BAOpp", "ERA", "BFP","GF","R",
-                    "RA9", "Age", "WAA", "WAR"
+                    "RA9", "Age", "WAA", "WAR", "ERA_plus", "jaws", "HOFM_Points", "C_HOFM_Points"
                     )
-  war_and_fip <- c("IPouts", "BB", "SO", "W","BAOpp", "L", "SV", "RA9", "WAA", "WAA_rank", "WAR", "Eff_WAR")
-  grit <- c("AllStar", "AllStarStart", "WSWin", "MVPWin", "MVPShare", "CYWin", "CYShare", "RelOYWin", "PTC_Win", "GG_Win", "TookSteroids")
+  war_and_fip <- c("IPouts", "BB", "SO", "W","BAOpp", "L", "SV", "WAA", "WAA_rank", "WAR", "ERA_plus", "jaws", "HOFM_Points", "C_HOFM_Points")
+  grit <- c("AllStar", "AllStarStart", "WSWin", "MVPWin", "MVPShare", "CYWin", "CYShare", "GG_Win", "TookSteroids")
   
   if (is.null(P_LIST_OF_STATS)) {
     P_LIST_OF_STATS <- c(war_and_fip,  grit)
   }
   
   kk <- .data %>%
-    dplyr::filter(finalGame>=final_game_min, finalGame<=final_game_max) %>%
-    dplyr::mutate(Eff_WAR = (WAR / IPouts)*100)
+    dplyr::filter(finalGame>=final_game_min, finalGame<=final_game_max)
   
   kk$ORDER_KEY <- kk[[ORDER_KEY]]
   
@@ -564,6 +679,7 @@ p_get_fit_data <- function(.data,
   #TODO: find a better way to accomplish this
   # specifically, because I'm gathering both numeric and factor columns,
   # everything gets cast as character, and need to convert back
+  
   for (s in col_numerics) {
     kkg %<>% mutate_each(funs(as.numeric), starts_with(s))
   }
@@ -583,31 +699,24 @@ p_get_fit_data <- function(.data,
     }
   }
   
-  # Mean + Median Creation
   med_df <- kkg %>%
-    filter(IPouts_1 > 0) %>%
     rowwise() %>%
     mutate(Season_Vec = pmap(across(starts_with("IPouts_")), ~ c(...) %>% discard(~ . == 0)),
-           Seasons = length(Season_Vec),
-           WAR_Vec  = list(map(seq_len(Seasons), ~ get(paste0("WAR_", .)))),
-           WAA_Vec = list(map(seq_len(Seasons), ~ get(paste0("WAA_", .)))),
-           WAR_IP_Vec = list(map(seq_len(Seasons), ~ get(paste0("Eff_WAR_", .)))),
-           Median_WAA = median(unlist(WAA_Vec)),
-           Median_WAR = median(unlist(WAR_Vec)),
-           Median_Eff_WAR = median(unlist(WAR_IP_Vec)),
-           Mean_WAR = mean(unlist(WAR_Vec)),
-           Mean_WAA = mean(unlist(WAA_Vec)),
-           Mean_Eff_WAR = mean(unlist(WAR_IP_Vec))
+           Seasons = length(Season_Vec)
     ) %>%
-    select(playerID, Seasons, Median_WAA, Median_WAR, Median_Eff_WAR, Mean_WAA, Mean_WAR, Mean_Eff_WAR)
+    select(playerID, Seasons)
+
+
   
   kkg %>%
     left_join(med_df, by = 'playerID') %>%
     filter(playerID!='rosepe01', playerID!='jacksjo01') %>%
     mutate(
-      TookSteroids = pmax(!!!select(., starts_with("TookSteroids_")), na.rm = TRUE)
+      TookSteroids = pmax(!!!select(., starts_with("TookSteroids_")), na.rm = TRUE),
+      jaws = pmax(!!!select(., starts_with("jaws_")), na.rm = TRUE),
+      C_HOFM_Points = pmax(!!!select(., starts_with("C_HOFM_Points")), na.rm = TRUE)
     ) %>%
-    select(-starts_with(c("TookSteroids_")))
+    select(-starts_with(c("TookSteroids_", "jaws_", "C_HOFM_Points_")))
 }
 
 p_get_aggregated_fit_df <-
@@ -615,11 +724,9 @@ p_get_aggregated_fit_df <-
            keys_to_aggregate=c('^AllStar_',
                                '^AllStarStart_',
                                '^WSWin_', '^MVPWin_','^MVPShare_',
-                               '^CYWin_', '^CYShare_', '^RelOYWin_', '^PTC_Win_', "^GG_Win_", "^TookSteroids_"),
-           keys_to_keep=c("^playerID$",
-                          "^inducted$",
-                          "^POS$",
-                          "^WAR_[0-9]+$")) {
+                               '^CYWin_', '^CYShare_', "^GG_Win_", "^HOFM_Points_"),
+                               #"^W_", "^SO_", "SV_"),
+           keys_to_keep=c("^playerID$", "^C_HOFM_Points$")) {
     
     nn <- names(fit_df)
     i = 0
@@ -640,16 +747,23 @@ p_get_aggregated_fit_df <-
       dfX[[nk]] <- agg1
     }
     
-    k = '^WAR_'
-    cc = grep(k, names(dfX))
-    dfX$CWAR <- rowSums(dfX[,cc])
+    #k = '^WAR_'
+    #cc = grep(k, names(dfX))
+    #dfX$WAR <- rowSums(dfX[,cc])
     
-    dfX
+    #k = '^WAA_'
+    #cc_k = grep(k, names(dfX))
+    #dfX$WAA <- rowSums(dfX[,cc_k])
+    
+    
+    dfX %>%
+      mutate(HOFM_Points = C_HOFM_Points + HOFMPoints) %>%
+      select(-HOFMPoints, -C_HOFM_Points)
   }
 
 p_append_br_war <- function(.data, war) {
   tmp <- war %>%
-    dplyr::select(player_ID, WAA, WAR, year_ID, stint_ID)
+    dplyr::select(player_ID, WAA, WAR, ERA_plus, year_ID, stint_ID)
   
   tmp <- tmp %>%
     combine_war_stints() %>%
@@ -665,7 +779,7 @@ p_append_br_war <- function(.data, war) {
 }
 
 p_convert_to_factors <- function(dfX,
-                               factors_list=c("^AllStar", "^MVPWin", "^WSWin", "^CYWin", "^RelOYWin", '^PTC_Win_', "^GG_Win_", "^TookSteroids_")) {
+                               factors_list=c("^AllStar", "^MVPWin", "^WSWin", "^CYWin", "^GG_Win_", "^TookSteroids_")) {
   
   cc <- unlist(lapply(factors_list, grep, names(dfX)))
   for (i in seq_along(cc)) {
@@ -677,8 +791,13 @@ p_convert_to_factors <- function(dfX,
   
 }
 
-compute_jaws <- function(war_df) {
-  jaws_df <- war_df %>%
+
+## Manipulate WAR Features ##
+
+# JAWS (Jaffe)
+append_jaws <- function(.data) {
+  
+  jaws_df <- .data %>%
     group_by(playerID) %>%
     mutate(WAR=as.numeric(WAR)) %>%
     arrange(-WAR) %>%
@@ -691,7 +810,426 @@ compute_jaws <- function(war_df) {
                      cwar=sum(WAR),
                      pwar=sum(ipeak*WAR),
                      jaws=0.5*(cwar+pwar)) %>%
-    ungroup()
+    ungroup() %>%
+    select(playerID, jaws)
+  
+  jaws_df <- .data %>%
+    group_by(playerID) %>%
+    mutate(WAR=as.numeric(WAR_def)) %>%
+    arrange(-WAR) %>%
+    dplyr::mutate(war_rank=row_number(),
+                  ipeak=as.integer(war_rank<=7),
+                  nyear=max(war_rank)) %>%
+    group_by(playerID, votedBy, POS) %>%
+    dplyr::summarise(last_year=max(yearID),
+                     nyear=mean(nyear),
+                     cwar=sum(WAR),
+                     pwar=sum(ipeak*WAR),
+                     d_jaws=0.5*(cwar+pwar)) %>%
+    ungroup() %>%
+    select(playerID, d_jaws) %>%
+    left_join(jaws_df, by = 'playerID')
+
+  
+  .data %>% left_join(jaws_df, by = 'playerID')
+}
+
+append_p_jaws <- function(.data) {
+  
+  jaws_df <- .data %>%
+    group_by(playerID) %>%
+    mutate(WAR=as.numeric(WAR)) %>%
+    arrange(-WAR) %>%
+    dplyr::mutate(war_rank=row_number(),
+                  ipeak=as.integer(war_rank<=7),
+                  nyear=max(war_rank)) %>%
+    group_by(playerID, votedBy, POS) %>%
+    dplyr::summarise(last_year=max(yearID),
+                     nyear=mean(nyear),
+                     cwar=sum(WAR),
+                     pwar=sum(ipeak*WAR),
+                     jaws=0.5*(cwar+pwar)) %>%
+    ungroup() %>%
+    select(playerID, jaws)
+  
+  
+  .data %>% left_join(jaws_df, by = 'playerID')
+}
+
+# Hall of Fame Monitor (James)
+append_HOFM <- function(.data){
+  
+  BALead_df <- .data %>%
+    mutate(
+      Qual_PA = case_when(
+        yearID < 1961 ~ 477.4,
+        yearID >= 1961 ~ 502.2
+      )
+    ) %>%
+    filter(PA > Qual_PA) %>%
+    group_by(yearID) %>%
+    summarise(
+      Qual_PA = max(Qual_PA),
+      max_BA = max(BA)
+      )
+  
+  MLBLead_df <- .data %>%
+    mutate(XB = X2B + X3B) %>%
+    group_by(yearID) %>%
+    summarise(
+      max_HR = max(HR),
+      max_RBI = max(RBI),
+      max_R = max(R),
+      max_H = max(H),
+      max_SB = max(SB),
+      max_XB = max(XB)
+    )
+  
+  
+  HOFM_df <- .data %>%
+    left_join(BALead_df, by = 'yearID') %>%
+    left_join(MLBLead_df, by = 'yearID') %>%
+    mutate(
+      BA_pts = case_when(
+        BA >= 0.4 & G > 100 ~ 15.0,
+        BA >= 0.35 & BA < 0.4 & G >= 100 ~ 5.0,
+        BA >= 0.3 & BA < 0.35 & G >= 100 ~ 2.5,
+        TRUE ~ 0
+      ),
+      H_pts = case_when(
+        H >= 200 ~ 5,
+        TRUE ~ 0
+      ),
+      RBI_pts = case_when(
+        RBI >= 100 ~ 3,
+        TRUE ~ 0
+      ),
+      R_pts = case_when(
+        R >= 100 ~ 3,
+        TRUE ~ 0
+      ),
+      HR_pts = case_when(
+        HR >= 50 ~ 10,
+        HR >= 40 ~ 4,
+        HR >= 30 ~ 2,
+        TRUE ~ 0
+      ),
+      X2B_pts = case_when(
+        X2B >= 45 ~ 2,
+        X2B >= 35 ~ 1,
+        TRUE ~ 0
+      ),
+      MVP_pts = case_when(
+        MPVWin == 1 ~ 8,
+        TRUE ~ 0
+      ),
+      ASG_pts = case_when(
+        AllStar == 1 ~ 3,
+        TRUE ~ 0
+      ),
+      GG_pts = case_when(
+        GG_Win == 1 & POS %in% c('C', 'SS', '2B') ~ 2,
+        GG_Win == 1 & POS %notin% c('C', 'SS', '2B') ~ 1,
+        TRUE ~ 0
+      ),
+      WS_pts = case_when(
+        G > 82 & WSWin == 1 & POS %in% c('C', 'SS') ~ 6,
+        G > 82 & WSWin == 1 & POS %in% c('2B') ~ 5,
+        G > 82 & WSWin == 1 & POS %in% c('3B','OF') ~ 3,
+        G > 82 & WSWin == 1 & POS %in% c('1B') ~ 1,
+        TRUE ~ 0
+      ),
+      Pen_pts = case_when(
+        G > 82 & PenWin == 1 & WSWin == 0 & POS %in% c('C', 'SS') ~ 5,
+        G > 82 & PenWin == 1 & WSWin == 0 & POS %in% c('2B') ~ 3,
+        G > 82 & PenWin == 1 & WSWin == 0 & POS %in% c('3B','OF') ~ 1,
+        TRUE ~ 0
+      ),
+      Div_pts = case_when(
+        G > 82 & DivWin == 1 & PenWin == 0 & WSWin == 0 & POS %in% c('C', 'SS') ~ 2,
+        G > 82 & DivWin == 1 & PenWin == 0 & WSWin == 0 & POS %in% c('2B', '3B','OF') ~ 1,
+        TRUE ~ 0
+      ),
+      LeadBA_pts = case_when(
+        PA > Qual_PA & BA == max_BA ~ 6,
+        TRUE ~ 0
+      ),
+      LeadHR_pts = case_when(
+        HR == max_HR ~ 4,
+        TRUE ~ 0
+      ),
+      LeadRBI_pts = case_when(
+        RBI == max_RBI ~ 4,
+        TRUE ~ 0
+      ),
+      LeadR_pts = case_when(
+        R == max_R ~ 3,
+        TRUE ~ 0
+      ),
+      LeadH_pts = case_when(
+        H == max_H ~ 2,
+        TRUE ~ 0
+      ),
+      LeadSB_pts = case_when(
+        SB == max_SB ~ 2,
+        TRUE ~ 0
+      ),
+      LeadXB_pts = case_when(
+        (X2B+X3B) == max_XB ~ 2,
+        TRUE ~ 0
+      )
+      ) %>%
+    rowwise() %>%
+    mutate(
+      HOFM_Points = sum(c_across(ends_with("_pts")))
+    ) %>%
+    ungroup() %>%
+    select(-ends_with("_pts"), -starts_with("max_"), -Qual_PA)
+  return(HOFM_df)
+}
+
+append_C_HOFM <- function(.data){
+  
+  HOFM_df <- .data %>%
+    group_by(playerID, POS) %>%
+    mutate(
+      C_H_Pts = case_when(
+        sum(H) >= 3500 ~ 50,
+        sum(H) >= 3000 & sum(H) < 3500 ~ 40,
+        sum(H) >= 2500 & sum(H) < 3000 ~ 15,
+        sum(H) >= 2000 & sum(H) < 2500 ~ 4,
+        TRUE ~ 0
+      ),
+      C_HR_Pts = case_when(
+        sum(HR) >= 600 ~ 30,
+        sum(HR) >= 500 & sum(HR) < 600 ~ 20,
+        sum(HR) >= 400 & sum(HR) < 500 ~ 10,
+        sum(HR) >= 300 & sum(HR) < 400 ~ 3,
+        TRUE ~ 0
+      ),
+      C_BA_Pts = case_when(
+        (sum(H) / sum(AB)) >= .330 ~ 24,
+        (sum(H) / sum(AB)) >= .315 ~ 16,
+        (sum(H) / sum(AB)) >= .300 ~ 8,
+        TRUE ~ 0
+      ),
+      C_G_Pts = case_when(
+        POS == 'C' & sum(G) >= 1800 ~ 60,
+        POS == 'C' & sum(G) >= 1600 & sum(G) < 1800 ~ 45,
+        POS == 'C' & sum(G) >= 1400 & sum(G) < 1600 ~ 30,
+        POS == 'C' & sum(G) >= 1200 & sum(G) < 1400 ~ 15,
+        POS %in% c('2B', 'SS') & sum(G) >= 2100 ~ 30,
+        POS %in% c('2B', 'SS') & sum(G) >= 1800 & sum(G) < 2100  ~ 15,
+        POS == '3B' & sum(G) > 2500 ~ 15,
+        TRUE ~ 0
+      ),
+      C_GAdd_Pts = case_when(
+        POS %in% c('2B', 'SS', '3B') & sum(G) >= 2500 ~ 15,
+        TRUE ~ 0
+      ),
+      C_GBA_Add_Pts = case_when(
+        POS %in% c('2B', 'SS', 'C') & sum(G) >= 1500 & (sum(H) / sum(AB)) >= .275 ~ 15,
+        TRUE ~ 0
+      ),
+      C_HOFM_Points = C_H_Pts + C_HR_Pts + C_BA_Pts + C_G_Pts + C_GAdd_Pts + C_GBA_Add_Pts
+    ) %>%
+    ungroup() %>%
+    select(-ends_with("_Pts"), -starts_with("max_"))
+  
+  return(HOFM_df)
+}
+
+p_append_HOFM <- function(.data){
+  
+  BALead_df <- .data %>%
+    mutate(
+      Qual_IP = case_when(
+        yearID < 1961 ~ 154,
+        yearID >= 1961 ~ 162
+      ),
+      WP = W / (W+L)
+    ) %>%
+    filter(IPouts > Qual_IP) %>%
+    group_by(yearID) %>%
+    summarise(
+      Qual_IP = max(Qual_IP),
+      min_ERA = min(ERA),
+      max_WP = max(WP)
+    )
+  
+  MLBLead_df <- .data %>%
+    group_by(yearID) %>%
+    summarise(
+      max_G = max(G),
+      max_W = max(W),
+      max_IPouts = max(IPouts),
+      max_SO = max(SO),
+      max_SV = max(SV),
+      max_SHO = max(SHO),
+      max_CG = max(CG)
+    )
+  
+  
+  HOFM_df <- .data %>%
+    left_join(BALead_df, by = 'yearID') %>%
+    left_join(MLBLead_df, by = 'yearID') %>%
+    mutate(
+      W_pts = case_when(
+        W >= 30 ~ 15,
+        W >= 25 & W < 30 ~ 10,
+        W >= 23 & W < 25 ~ 8,
+        W >= 20 & W < 23 ~ 6,
+        W >= 18 & W < 20 ~ 4,
+        W >= 15 & W < 18 ~ 2,
+        TRUE ~ 0
+      ),
+      SO_pts = case_when(
+        SO >= 300 ~ 6,
+        SO >= 250 & SO < 300 ~ 3,
+        SO >= 200 & W < 250 ~ 2,
+        TRUE ~ 0
+      ),
+      WP_pts = case_when(
+        W >= 14 & W/(W+L) >= 0.7 ~ 2,
+        TRUE ~ 0
+      ),
+      ERA_pts = case_when(
+        IPouts >= 150 & ERA < 2.00 ~ 4,
+        IPouts >= 150 & ERA < 3.00 & ERA >=2.00 ~ 1,
+        TRUE ~ 0
+      ),
+      SV_pts = case_when(
+        SV >= 40 ~ 7,
+        SV >= 30 & SV < 40 ~ 4,
+        SV >= 20 & SV < 30 ~ 1,
+        TRUE ~ 0
+      ),
+      MVP_pts = case_when(
+        MPVWin == 1 ~ 8,
+        TRUE ~ 0
+      ),
+      CY_pts = case_when(
+        CYWin == 1 ~ 5,
+        TRUE ~ 0
+      ),
+      ASG_pts = case_when(
+        AllStar == 1 ~ 3,
+        TRUE ~ 0
+      ),
+      GG_pts = case_when(
+        GG_Win == 1 ~ 1,
+        TRUE ~ 0
+      ),
+      WS_pts = case_when(
+        IPouts > 50 & WSWin == 1 ~ 2.5,
+        TRUE ~ 0
+      ),
+      Pen_pts = case_when(
+        IPouts > 50 & PenWin == 1 & WSWin == 0 ~ 1,
+        TRUE ~ 0
+      ),
+      Div_pts = case_when(
+        IPouts > 50 & DivWin == 1 & PenWin == 0 & WSWin == 0 ~ 0.5,
+        TRUE ~ 0
+      ),
+      LeadERA_pts = case_when(
+        IPouts > Qual_IP & ERA == min_ERA ~ 2,
+        TRUE ~ 0
+      ),
+      LeadG_pts = case_when(
+        G == max_G ~ 1,
+        TRUE ~ 0
+      ),
+      LeadW_pts = case_when(
+        W == max_W ~ 1,
+        TRUE ~ 0
+      ),
+      LeadIP_pts = case_when(
+        IPouts == max_IPouts ~ 1,
+        TRUE ~ 0
+      ),
+      LeadWP_pts = case_when(
+        (W/(W+L)) == max_WP & IPouts > Qual_IP ~ 1,
+        TRUE ~ 0
+      ),
+      LeadSO_pts = case_when(
+        SO == max_SO ~ 1,
+        TRUE ~ 0
+      ),
+      LeadSV_pts = case_when(
+        SV == max_SV ~ 1,
+        TRUE ~ 0
+      ),
+      LeadSHO_pts = case_when(
+        SHO == max_SHO ~ 1,
+        TRUE ~ 0
+      ),
+      LeadCG_pts = case_when(
+        CG == max_CG ~ 0.5,
+        TRUE ~ 0
+      )
+    ) %>%
+    rowwise() %>%
+    mutate(
+      HOFM_Points = sum(c_across(ends_with("_pts")))
+    ) %>%
+    ungroup() %>%
+    select(-ends_with("_pts"), -starts_with("max_"), -Qual_IP, -min_ERA)
+  return(HOFM_df)
+}
+
+p_append_C_HOFM <- function(.data){
+  
+  HOFM_df <- .data %>%
+    group_by(playerID, POS) %>%
+    mutate(
+      C_W_Pts = case_when(
+        sum(W) >= 300 ~ 35,
+        sum(W) >= 275 & sum(W) < 300 ~ 25,
+        sum(W) >= 250 & sum(W) < 275 ~ 20,
+        sum(W) >= 225 & sum(W) < 250 ~ 15,
+        sum(W) >= 200 & sum(W) < 225 ~ 10,
+        sum(W) >= 175 & sum(W) < 200 ~ 8,
+        sum(W) >= 150 & sum(W) < 175 ~ 5,
+        TRUE ~ 0
+      ),
+      C_WP_Pts = case_when(
+        sum(W) / (sum(W) + sum(L)) >= .625 & sum(GS) >= 190 ~ 8,
+        sum(W) / (sum(W) + sum(L)) >= .600 & sum(W) / (sum(W) + sum(L)) < .625 & sum(GS) >= 190 ~ 5,
+        sum(W) / (sum(W) + sum(L)) >= .575 & sum(W) / (sum(W) + sum(L)) < .600 & sum(GS) >= 190 ~ 3,
+        sum(W) / (sum(W) + sum(L)) >= .550 & sum(W) / (sum(W) + sum(L)) < .575 & sum(GS) >= 190 ~ 1,
+        TRUE ~ 0
+      ),
+      C_ERA_Pts = case_when(
+        ((sum(ER) / sum(IPouts)))*9 < 3.00 & sum(GS) >= 190 ~ 10,
+        TRUE ~ 0
+      ),
+      C_SV_Pts = case_when(
+        sum(SV) >= 300 ~ 20,
+        sum(SV) >= 200 & sum(SV) < 300 ~ 20,
+        TRUE ~ 0
+      ),
+      C_G_Pts = case_when(
+        sum(G) >= 1000 ~ 30,
+        sum(G) >= 850 & sum(G) < 1000 ~ 20,
+        sum(G) >= 700 & sum(G) < 850 ~ 20,
+        TRUE ~ 0
+      ),
+      C_SO_Pts = case_when(
+        sum(SO) >= 4000 ~ 20,
+        sum(SO) >= 3000 & sum(20) < 4000 ~ 10,
+        TRUE ~ 0
+      ),
+      C_3CY_Pts = case_when(
+        sum(CYWin) >= 3 ~ 15,
+        TRUE ~ 0
+      ),
+      C_HOFM_Points = C_SO_Pts + C_G_Pts + C_SV_Pts + C_ERA_Pts + C_WP_Pts + C_W_Pts + C_3CY_Pts
+    ) %>%
+    ungroup() %>%
+    select(-ends_with("_Pts"), -starts_with("max_"))
+  
+  return(HOFM_df)
 }
 
 normalize_war <- function(dfX) {

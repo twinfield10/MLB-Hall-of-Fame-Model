@@ -15,8 +15,13 @@ pull_br_data <- function() {
 pull_fg_data <- function () {
   #BATTING: https://www.fangraphs.com/leaders-legacy.aspx?pos=all&stats=bat&lg=all&qual=y&type=c,4,6,11,12,13,21,-1,40,41,-1,23,37,38,50,61,111,-1,203,199,58,7,8,9,10,14,15,16,17,18,19,20,21,22,50,51,52&season=2022&month=0&season1=1871&ind=1&team=&rost=&age=&filter=&players=0&startdate=&enddate=
   #PITCHING: https://www.fangraphs.com/leaders-legacy.aspx?pos=all&stats=pit&lg=all&qual=y&type=c,4,5,11,7,8,13,-1,36,37,40,43,44,48,51,-1,6,45,62,-1,59,6,14,15,16,17,18,19,20,21,22,23,24&season=2022&month=0&season1=1871&ind=1&team=0&rost=0&age=0&filter=&players=0
-  fg_bat_war <- read_csv('FG_WAR_BAT_2022.csv')
-  fg_pitch_war <- read_csv('FG_WAR_PIT_2022.csv')
+  
+  #GIT Read
+  bat_path <- 'https://raw.githubusercontent.com/twinfield10/MLB-Hall-of-Fame-Model/main/Data/FG_WAR_BAT_2022.csv'
+  pit_path <- 'https://raw.githubusercontent.com/twinfield10/MLB-Hall-of-Fame-Model/main/Data/FG_WAR_PIT_2022.csv'
+  
+  fg_bat_war <- read_csv(bat_path)
+  fg_pitch_war <- read_csv(pit_path)
   list(BattingWAR=fg_bat_war, PitchingWAR=fg_pitch_war) }
 
 combine_bat_pitch <- function(.data) {
@@ -65,7 +70,6 @@ get_ROID_ID <- function() {
     'Andy Pettitte',
     'Manny Ramirez',
     'Brian Roberts',
-    'Ivan Rodriguez',
     'Alex Rodriguez',
     'Benito Santiago',
     'Gary Sheffield',
