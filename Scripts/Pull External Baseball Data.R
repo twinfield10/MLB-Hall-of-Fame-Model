@@ -10,7 +10,7 @@ pull_br_data <- function() {
   dtype <- "ciiciciciiiddidddiddiddddddddddddddddddddd"
   br_pitch_war <- read_csv(bref_pitch_url, col_types = dtype)
   list(BattingWAR=br_bat_war, PitchingWAR=br_pitch_war)
-  }
+}
 
 pull_fg_data <- function () {
   #BATTING: https://www.fangraphs.com/leaders-legacy.aspx?pos=all&stats=bat&lg=all&qual=y&type=c,4,6,11,12,13,21,-1,40,41,-1,23,37,38,50,61,111,-1,203,199,58,7,8,9,10,14,15,16,17,18,19,20,21,22,50,51,52&season=2022&month=0&season1=1871&ind=1&team=&rost=&age=&filter=&players=0&startdate=&enddate=
@@ -37,47 +37,15 @@ combine_bat_pitch <- function(.data) {
 ## Roid IDs ##
 get_ROID_ID <- function() {
   names <- c(
-    'Barry Bonds',
-    'Bret Boone',
-    'Tim Beckham',
-    'Ervin Santana',
-    'Dee Gordon',
-    'Starling Marte',
-    'Fernando Tatis',
-    'Ryan Braun',
-    'Michael Pineda',
-    'Melky Cabrera',
-    'Bartolo Colon',
-    'Nelson Cruz',
-    'Paul Lo Duca',
-    'Robinson Cano',
-    'Kevin Brown',
-    'Ken Caminiti',
-    'Jose Canseco',
-    'Roger Clemens',
-    'Lenny Dykstra',
-    'Chuck Finley',
-    'Eric Gagne',
-    'Jason Giambi',
-    'Troy Glaus',
-    'Jose Guillen',
-    'Wally Joyner',
-    'David Justice',
-    'Chuck Knoblauch',
-    'Mark McGwire',
-    'Magglio Ordonez',
-    'Rafael Palmeiro',
-    'Andy Pettitte',
-    'Manny Ramirez',
-    'Brian Roberts',
-    'Alex Rodriguez',
-    'Benito Santiago',
-    'Gary Sheffield',
-    'Sammy Sosa',
-    'Miguel Tejada',
-    'Mo Vaughn',
-    'Matt Williams',
-    'Gregg Zaun'
+    'Barry Bonds','Bret Boone','Tim Beckham','Ervin Santana','Dee Gordon',
+    'Starling Marte','Fernando Tatis','Ryan Braun','Michael Pineda','Melky Cabrera',
+    'Bartolo Colon','Nelson Cruz','Paul Lo Duca','Robinson Cano','Kevin Brown',
+    'Ken Caminiti','Jose Canseco','Roger Clemens','Lenny Dykstra','Chuck Finley',
+    'Eric Gagne','Jason Giambi','Troy Glaus','Jose Guillen','Wally Joyner',
+    'David Justice','Chuck Knoblauch','Mark McGwire','Magglio Ordonez',
+    'Rafael Palmeiro','Andy Pettitte','Manny Ramirez','Brian Roberts','Alex Rodriguez',
+    'Benito Santiago','Gary Sheffield','Sammy Sosa','Miguel Tejada','Mo Vaughn',
+    'Matt Williams','Gregg Zaun'
   )
   
   false_names <- c("Kevin Brown3/14/1965", "Kevin Brown4/21/1973",

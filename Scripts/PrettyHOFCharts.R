@@ -1,6 +1,11 @@
 ## Build Helper Functions ##
 library(mlbplotR)
 library(gt)
+
+## Read Result CSV's From GitHub
+results_df_test <- read.csv('https://raw.githubusercontent.com/twinfield10/MLB-Hall-of-Fame-Model/main/Results/BattersResults_HOFModel.csv') %>% select(-X)
+p_results_df_test <- read.csv('https://raw.githubusercontent.com/twinfield10/MLB-Hall-of-Fame-Model/main/Results/PitchersResults_HOFModel.csv') %>% select(-X)
+
 ## Color Scales ##
 CareerWAR_Col_Func <- function(x) {
   ifelse(x < -100, "#ff0000",
@@ -158,14 +163,15 @@ BAT_TM <- Lahman::Batting %>%
 
 ## Plot Eligible Players and Probability ##
 eligible_retired <- function(type = 'BAT',
-                             Roids = c(1,0),
+                             Roids = 0,
                              RecentRetire = c(1,0),
-                             active_ply = c('Y', 'N'),
+                             active_ply = 'N',
                              lim = 20,
                              sub_type = c("1B", "2B", "3B", "SS", "C", "OF", "P"),
                              age = 100,
-                             elig = c('Y', 'N'),
-                             tm = valid_team_names()){
+                             elig = 'Y',
+                             tm = valid_team_names(),
+                             vetcom = 'N'){
   
   #sub_type <- if_else(type == 'PIT', c('P'), sub_type)
   
@@ -175,10 +181,16 @@ eligible_retired <- function(type = 'BAT',
     BAT_TM
   }
   
-  elig <- if(length(active_ply) == 1 & active_ply == 'Y'){
+  elig <- if(length(active_ply) < 2 & active_ply == 'Y'){
     'N'
   } else {
     elig
+  }
+  
+  vetcom <- if(length(active_ply) < 2 & active_ply == 'Y'){
+    'N'
+  } else {
+    vetcom
   }
   
   df <- if(type == 'PIT'){
@@ -250,7 +262,8 @@ eligible_retired <- function(type = 'BAT',
            Eligible = if_else(finalGame <= "2017-01-01" & Seasons >= 10 & Active == 'N', 'Y', 'N'),
            Inducted = inducted,
            Name = paste0(nameFirst, " ", nameLast),
-           HOF_Prob = round(HOF_Prob, digits = 4)
+           HOF_Prob = round(HOF_Prob, digits = 4),
+           VetCom = if_else(playerID %in% VetCom_IDs, 'Y', 'N')
     ) %>%
     arrange(desc(predict), desc(HOF_Prob), desc(WARPerYR), -WAR_1) %>%
     filter(TookSteroids %in% Roids) %>%
@@ -259,21 +272,22 @@ eligible_retired <- function(type = 'BAT',
     filter(POS %in% sub_type) %>%
     filter(Age < age) %>%
     filter(WAR > 10) %>%
-    filter(Eligible %in% elig)
-  
+    filter(Eligible %in% elig) %>%
+    filter(VetCom %in% vetcom)
+
   df <- if(length(tm) == 33){
     df %>%
-      select(Name, Age, POS, Primary_Team, Active, WAR, WARPerYR, WAR_1, predict, HOF_Prob, Eligible, Inducted) %>%
+      select(Name, Age, POS, Primary_Team, Active, WAR, WARPerYR, WAR_1, HOFM_Points, jaws, predict, HOF_Prob, Eligible, Inducted) %>%
       head(lim)
   } else if(length(tm) == 1) {
     df %>%
       filter(if_any(starts_with("Team_"), ~ . == tm)) %>%
       mutate(Primary_Team = tm) %>%
-      select(Name, Age, POS, Primary_Team, Active, WAR, WARPerYR, WAR_1, predict, HOF_Prob, Eligible, Inducted) %>%
+      select(Name, Age, POS, Primary_Team, Active, WAR, WARPerYR, WAR_1, HOFM_Points, jaws, predict, HOF_Prob, Eligible, Inducted) %>%
       head(lim)
   } else {
     df %>%
-      select(Name, Age, POS, Primary_Team, Active, WAR, WARPerYR, WAR_1, predict, HOF_Prob, Eligible, Inducted) %>%
+      select(Name, Age, POS, Primary_Team, Active, WAR, WARPerYR, WAR_1, HOFM_Points, jaws, predict, HOF_Prob, Eligible, Inducted) %>%
       head(lim)
   }
 
@@ -282,10 +296,12 @@ eligible_retired <- function(type = 'BAT',
     "All"
   } else if(length(active_ply == 1) & active_ply == 'Y') {
     'All Active'
-  } else if(length(active_ply == 1) & active_ply == 'N' & length(elig) == 2) {
+  } else if(length(active_ply == 1) & active_ply == 'N' & length(elig) == 2 & length(vetcom) == 2) {
     'All Retired'
-  } else if(length(active_ply == 1) & elig == 'Y'){
-    'All Eligible'
+  } else if(length(active_ply == 1) & elig == 'Y' & length(vetcom) == 1 & vetcom == 'Y'){
+    'All Eligible (inc. Potential Vet. Committee Elections)'
+  } else if(length(active_ply == 1) & elig == 'Y' & length(vetcom) == 1 & vetcom == 'N'){
+    'All Eligible (BBWWAA Ballot)'
   } else {
     print("Empty DataFrame - Try Again")
   }
@@ -294,6 +310,7 @@ eligible_retired <- function(type = 'BAT',
   roid_lab <- if_else(Roids == 1, "(Including PED Users)", '')
   age_lab <- if_else(age == 100, '', paste0('Under ',age))
   final_lab <- paste("Liklihood of Entering the MLB Hall of Fame Among", act_lab, pos_lab, age_lab, roid_lab, "As Of 1/1/2023", sep = ' ')
+
 
   # Create a gt object with specified formatting
   gt_obj <- df %>%
@@ -307,15 +324,22 @@ eligible_retired <- function(type = 'BAT',
       WAR = md("Career"),
       WARPerYR = md("Per Year"),
       WAR_1 = md("Best Season"),
+      HOFM_Points = md("Monitor (James)"),
+      jaws = md("JAWS (Jaffe)"),
       predict = md("Make HOF"),
       HOF_Prob = md("HOF %"),
       Eligible = md("Eligible '23"),
       Inducted = md("Inducted")
     ) %>%
     tab_spanner(
-      label = "Wins Above Replacement",
+      label = "WAR",
       columns = c(WAR, WARPerYR, WAR_1),
       id = 'WARP'
+    ) %>%
+    tab_spanner(
+      label = "HOF Metrics",
+      columns = c(HOFM_Points, jaws),
+      id = 'METRICS'
     ) %>%
     tab_spanner(
       label = "Player Info",
@@ -348,7 +372,7 @@ eligible_retired <- function(type = 'BAT',
           color = "#2F4985"
         )
       ),
-      locations = cells_column_spanners(spanners = c("WARP", "PLY", "PRED", "RESULT"))
+      locations = cells_column_spanners(spanners = c("WARP", "METRICS", "PLY", "PRED", "RESULT"))
     ) %>%
     tab_style(
       locations = cells_column_labels(),
@@ -362,7 +386,7 @@ eligible_retired <- function(type = 'BAT',
       )
     ) %>%
     tab_style(
-      locations = cells_column_labels(columns = c(Active, WAR_1, HOF_Prob)),
+      locations = cells_column_labels(columns = c(Active, WAR_1, jaws, HOF_Prob)),
       style = list(
         css(
           color = "black",
@@ -383,7 +407,7 @@ eligible_retired <- function(type = 'BAT',
       )
     ) %>%
     tab_style(
-      locations = cells_body(columns = c(Age, POS, Primary_Team, WARPerYR, WAR_1)),
+      locations = cells_body(columns = c(Age, POS, Primary_Team, WARPerYR, WAR_1, HOFM_Points)),
       style = list(
         css(
           text_align = "center"
@@ -391,7 +415,7 @@ eligible_retired <- function(type = 'BAT',
       )
     ) %>%
     tab_style(
-      locations = cells_body(columns = c(Active, WAR_1)),
+      locations = cells_body(columns = c(Active, WAR_1, jaws)),
       style = list(
         css(
           text_align = "center",
@@ -465,7 +489,7 @@ eligible_retired <- function(type = 'BAT',
       decimals = 2
     ) %>%
     fmt_number(
-      columns = c(WAR),
+      columns = c(WAR, HOFM_Points, jaws),
       decimals = 1
     ) %>%
     fmt_number(
@@ -500,13 +524,14 @@ return(gt_obj)
 
 }
 eligible_retired(type = 'BAT',
-                 Roids = 0,
+                 #Roids = 0,
                  active_ply = 'N',
-                 #sub_type = c('3B'),
-                 #tm = 'HOU',
+                 #sub_type = c('3B', 'SS', '1B', '2B'),
+                 #tm = 'TEX',
                  elig = 'Y',
-                 age = 100,
-                 lim = 10
+                 #age = 35,
+                 lim = 10,
+                 vetcom = 'Y'
                  )
 
 
