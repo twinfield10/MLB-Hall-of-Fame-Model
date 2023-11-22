@@ -2,9 +2,18 @@
 library(mlbplotR)
 library(gt)
 
+HOF_Ballot_IDs = c('beltrad01','rodrial01','beltrca01','heltoto01','mauerjo01','pettian01'
+,'utleych01','jonesan01','wrighda03','rolliji01','vizquom01','abreubo01','hunteto01','colonba01'
+,'hollima01','gonzaad01','martivi01','reyesjo01','phillbr01','buehrma01','wagnebi02','sheffga01'
+,'ramirma02','rodrifr03','bautijo02','shielja02')
+
 ## Read Result CSV's From GitHub
-results_df_test <- read.csv('https://raw.githubusercontent.com/twinfield10/MLB-Hall-of-Fame-Model/main/Results/BattersResults_HOFModel.csv') %>% select(-X)
-p_results_df_test <- read.csv('https://raw.githubusercontent.com/twinfield10/MLB-Hall-of-Fame-Model/main/Results/PitchersResults_HOFModel.csv') %>% select(-X)
+results_df_test <- read.csv('https://raw.githubusercontent.com/twinfield10/MLB-Hall-of-Fame-Model/main/Results/MLB_HOFPredictions_Batters_2023.csv') %>% select(-X)
+p_results_df_test <- read.csv('https://raw.githubusercontent.com/twinfield10/MLB-Hall-of-Fame-Model/main/Results/MLB_HOFPredictions_Pitchers_2023.csv') %>% select(-X)
+
+on_ballot_bat_df = results_df_test %>% filter(playerID %in% HOF_Ballot_IDs)
+on_ballot_p_df = p_results_df_test %>% filter(playerID %in% HOF_Ballot_IDs)
+print(length(on_ballot_p_df$playerID))
 
 ## Color Scales ##
 CareerWAR_Col_Func <- function(x) {
@@ -171,7 +180,8 @@ eligible_retired <- function(type = 'BAT',
                              age = 100,
                              elig = 'Y',
                              tm = valid_team_names(),
-                             vetcom = 'N'){
+                             vetcom = 'N',
+                             on_ballot = 'N'){
   
   #sub_type <- if_else(type == 'PIT', c('P'), sub_type)
   
@@ -205,7 +215,7 @@ eligible_retired <- function(type = 'BAT',
         WAR = rowSums(select(., starts_with("WAR_")))
       )
   }
-  #print(df)
+  print(df %>% filter(playerID %in% HOF_Ballot_IDs) %>% head())
   
   df<- df %>%
     merge(Lahman::People %>% select(playerID, nameLast, nameFirst, debut, finalGame, birthYear), by="playerID") %>%
@@ -213,7 +223,7 @@ eligible_retired <- function(type = 'BAT',
     mutate(Active = if_else(finalGame >= "2022-01-01", 'Y', 'N'),
            Deb_Age=as.numeric(substr(debut, 1, 4))-birthYear,
            Ret_Age=as.numeric(substr(finalGame, 1, 4))-birthYear,
-           Age=2022-birthYear,
+           Age=2023-birthYear,
            WARPerYR = WAR/Seasons,
            Active = case_when(
              nameFirst == 'Cole' & nameLast == 'Hamels' ~ 'N',
@@ -259,21 +269,25 @@ eligible_retired <- function(type = 'BAT',
              nameFirst == 'Jake' & nameLast == 'McGee' ~ 1,
              TRUE ~ 0
            ),
-           Eligible = if_else(finalGame <= "2017-01-01" & Seasons >= 10 & Active == 'N', 'Y', 'N'),
+           Eligible = if_else(finalGame <= "2019-01-01" & Seasons >= 10 & Active == 'N', 'Y', 'N'),
            Inducted = inducted,
            Name = paste0(nameFirst, " ", nameLast),
            HOF_Prob = round(HOF_Prob, digits = 4),
-           VetCom = if_else(playerID %in% VetCom_IDs, 'Y', 'N')
+           VetCom = if_else(playerID %in% VetCom_IDs, 'Y', 'N'),
+           On_Ballot = if_else(playerID %in% HOF_Ballot_IDs, 'Y', 'N')
     ) %>%
     arrange(desc(predict), desc(HOF_Prob), desc(WARPerYR), -WAR_1) %>%
-    filter(TookSteroids %in% Roids) %>%
+    #filter(TookSteroids %in% Roids) %>%
     filter(Retired_23 %in% RecentRetire) %>%
     filter(Active %in% active_ply) %>%
-    filter(POS %in% sub_type) %>%
     filter(Age < age) %>%
     filter(WAR > 10) %>%
     filter(Eligible %in% elig) %>%
-    filter(VetCom %in% vetcom)
+    filter(VetCom %in% vetcom) %>%
+    filter(On_Ballot %in% on_ballot) %>%
+    filter(predict == 'N')
+  
+  #print(df %>% filter(On_Ballot == 'Y') %>% select(Name))
 
   df <- if(length(tm) == 33){
     df %>%
@@ -290,6 +304,8 @@ eligible_retired <- function(type = 'BAT',
       select(Name, Age, POS, Primary_Team, Active, WAR, WARPerYR, WAR_1, HOFM_Points, jaws, predict, HOF_Prob, Eligible, Inducted) %>%
       head(lim)
   }
+  
+  
 
   # Create Subtitle Label #
   act_lab <- if(length(active_ply) == 2){
@@ -298,6 +314,8 @@ eligible_retired <- function(type = 'BAT',
     'All Active'
   } else if(length(active_ply == 1) & active_ply == 'N' & length(elig) == 2 & length(vetcom) == 2) {
     'All Retired'
+  } else if(on_ballot == 'Y'){
+    '2024 BBWWAA Ballot'
   } else if(length(active_ply == 1) & elig == 'Y' & length(vetcom) == 1 & vetcom == 'Y'){
     'All Eligible (inc. Potential Vet. Committee Elections)'
   } else if(length(active_ply == 1) & elig == 'Y' & length(vetcom) == 1 & vetcom == 'N'){
@@ -309,7 +327,7 @@ eligible_retired <- function(type = 'BAT',
   pos_lab <- if_else(type == 'PIT', 'Pitchers', if_else(type == 'BAT' & length(sub_type) == 7, 'Batters', paste(sub_type, collapse = ", ")))
   roid_lab <- if_else(Roids == 1, "(Including PED Users)", '')
   age_lab <- if_else(age == 100, '', paste0('Under ',age))
-  final_lab <- paste("Liklihood of Entering the MLB Hall of Fame Among", act_lab, pos_lab, age_lab, roid_lab, "As Of 1/1/2023", sep = ' ')
+  final_lab <- paste("Liklihood of Entering the MLB Hall of Fame Among", act_lab, pos_lab, age_lab, roid_lab, "As Of 11/22/2023", sep = ' ')
 
 
   # Create a gt object with specified formatting
@@ -328,7 +346,7 @@ eligible_retired <- function(type = 'BAT',
       jaws = md("JAWS (Jaffe)"),
       predict = md("Make HOF"),
       HOF_Prob = md("HOF %"),
-      Eligible = md("Eligible '23"),
+      Eligible = md("Eligible '24"),
       Inducted = md("Inducted")
     ) %>%
     tab_spanner(
@@ -528,10 +546,11 @@ eligible_retired(type = 'BAT',
                  active_ply = 'N',
                  #sub_type = c('3B', 'SS', '1B', '2B'),
                  #tm = 'TEX',
-                 elig = 'Y',
+                 #elig = 'Y',
                  #age = 35,
-                 lim = 10,
-                 vetcom = 'Y'
+                 lim = 25,
+                 #vetcom = 'N',
+                 on_ballot = 'Y'
                  )
 
 
