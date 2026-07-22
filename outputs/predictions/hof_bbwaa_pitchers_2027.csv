@@ -1,0 +1,10 @@
+"playerID","nameFirst","nameLast","POS","appearance_number","is_first_ballot","prev_share","pred_share","P_elected_cycle","P_eventual_bbwaa","Seasons","CareerWAR","WARperSeason","PeakWAR","JAWS","HOFM","TookSteroids","season"
+"hernafe02","Felix","Hernandez","SP",3,0,0.4612,0.6196,0.0955,1,15,49.9,3.33,7.2,44.2,62,0,2027
+"pettian01","Andy","Pettitte","SP",9,0,0.4847,0.5853,0.0765,0.3075,18,60.7,3.37,8.4,47.8,123,1,2027
+"hamelco01","Cole","Hamels","SP",2,0,0.2376,0.3855,0.0135,0.966,15,57.9,3.86,6.4,47.2,56,0,2027
+"buehrma01","Mark","Buehrle","SP",7,0,0.2,0.2247,0.0135,0.1565,16,60,3.75,6.1,48,50,0,2027
+"rodrifr03","Francisco","Rodriguez","RP",5,0,0.1176,0.1357,0,0.0835,16,24.2,1.51,3.7,20.9,122,0,2027
+"lestejo01","Jon","Lester","SP",1,1,0,0.1334,0,0.5805,16,43.5,2.72,6.2,39.1,94,0,2027
+"santaer01","Ervin","Santana","SP",1,1,0,0.034,0,0.0305,16,27.1,1.69,5.1,26.3,24,1,2027
+"arrieja01","Jake","Arrieta","SP",1,1,0,0.0017,0,0.0065,12,21.1,1.76,8.3,22.1,40,0,2027
+"kazmisc01","Scott","Kazmir","SP",1,1,0,0,0,0.0065,13,22.8,1.75,5.8,23,18,0,2027

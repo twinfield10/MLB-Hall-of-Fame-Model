@@ -1,0 +1,12 @@
+'n': 1892
+n_pos: 71
+prevalence: 0.0375264
+roc_auc: 0.9974399
+pr_auc: 0.9439187
+log_loss: 0.0271156
+brier: 0.0059869
+precision_at_k: 0.915493
+sensitivity: 0.9014085
+specificity: 0.9978034
+precision: 0.9411765
+f1: 0.9208633

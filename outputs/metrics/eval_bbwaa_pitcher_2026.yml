@@ -1,0 +1,15 @@
+'n': 1284
+share_mae: 0.0442282
+share_rmse: 0.0847137
+share_cor: 0.9271706
+elect_roc_auc: 0.9684625
+elect_pr_auc: 0.615997
+n_elect: 46
+best_tune:
+  nrounds: 150.0
+  max_depth: 3
+  eta: 0.3
+  gamma: 0.0
+  colsample_bytree: 0.8
+  min_child_weight: 1.0
+  subsample: 1.0

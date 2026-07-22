@@ -1,0 +1,8 @@
+"playerID","nameFirst","nameLast","POS","appearance_number","is_first_ballot","prev_share","pred_share","P_elected_cycle","P_eventual_bbwaa","Seasons","CareerWAR","WARperSeason","PeakWAR","JAWS","HOFM","TookSteroids","season"
+"pettian01","Andy","Pettitte","SP",8,0,0.2792,0.3006,0.0115,0.0955,18,60.7,3.37,8.4,47.8,123,1,2026
+"hernafe02","Felix","Hernandez","SP",2,0,0.2056,0.238,0.022,0.8385,15,49.9,3.33,7.2,44.2,62,0,2026
+"buehrma01","Mark","Buehrle","SP",6,0,0.1142,0.1921,0.013,0.3395,16,60,3.75,6.1,48,50,0,2026
+"hamelco01","Cole","Hamels","SP",1,1,0,0.1349,0,0.6315,15,57.9,3.86,6.4,47.2,56,0,2026
+"rodrifr03","Francisco","Rodriguez","RP",4,0,0.1015,0.1237,0,0.099,16,24.2,1.51,3.7,20.9,122,0,2026
+"gonzagi01","Gio","Gonzalez","SP",1,1,0,0.0092,0,0.0025,13,29.8,2.29,6.4,28.5,26,0,2026
+"porceri01","Rick","Porcello","SP",1,1,0,5e-04,0,5e-04,12,18.8,1.56,4.7,18.4,30,0,2026

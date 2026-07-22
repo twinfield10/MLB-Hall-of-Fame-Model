@@ -1,0 +1,54 @@
+# =============================================================================
+# 2026 BBWAA Hall of Fame ballot (the per-cycle manual input — it cannot be
+# derived from Lahman until after the fact).
+#
+# `short_ids` are 7-char stubs resolved to full playerIDs by
+# find_hof_ballot_ids(): the latest player per stub whose career ends on/before
+# `last_year` (= season - eligible_lag). `remove_ids` / `add_ids` are full
+# playerIDs applied after resolution to fix stub collisions and known additions.
+#
+# This mirrors the previously-hardcoded .ballot_ids_26 in R/cohorts.R exactly;
+# rolling to a new cycle = drop in Data/ballots/ballot_<season>.yml and point
+# config.yml `ballot_file` at it (no code edits).
+# =============================================================================
+last_year: 2020
+
+short_ids:
+  # First-time candidates
+  - braunry
+  - hamelco
+  - porceri
+  - choosh0
+  - encared
+  - gordoal
+  - gonzagi
+  - kempma0
+  - markani
+  - kendrho
+  - murphda
+  - pencehu
+  # Returning candidates
+  - beltrca
+  - jonean0
+  - rodrial
+  - ramirma
+  - utleych
+  - pettian
+  - hernafe
+  - abreubo
+  - pedrodu
+  - rolliji
+  - vizquom
+  - buehrma
+  - rodrifr
+  - wrighda
+  - hunteto
+
+remove_ids:
+  - hunteto03
+  - braunry01
+  - wrighda04
+  - murphda07
+
+add_ids:
+  - jonesan01

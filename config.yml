@@ -1,0 +1,77 @@
+# =============================================================================
+# MLB Hall of Fame Model — configuration
+#
+# The ONE value that normally changes year to year is `season`. Every temporal
+# cutoff (train/test windows, eligibility, active flag, age) is DERIVED from
+# `season` + the snapshot's DATA_SEASON in R/config.R::load_config() — nothing
+# temporal is hardcoded anywhere else. See README "Rolling to a new season".
+# =============================================================================
+
+season: 2026            # BBWAA induction cycle being predicted (the yearly knob)
+snapshot: lahman_2025   # dir under Data/snapshots/; DATA_SEASON is READ from its MANIFEST
+supplement: null        # e.g. supplement_2025.csv under Data/supplement/ (data past the snapshot)
+ballot_file: ballot_2026.yml  # per-cycle BBWAA ballot under Data/ballots/ (resolves same IDs as the old hardcoded list)
+live_refresh: false     # true => pull br_war fresh into Data/cache/; else use the cache
+
+max_data_lag: 2         # fail loudly if season - DATA_SEASON exceeds this AND no supplement given
+
+thresholds:
+  maxyear: 20           # top-N seasons per player kept in the wide feature matrix
+  jaws_peak: 7          # JAWS peak window (top-N WAR seasons)
+  min_pa: 100           # batter min plate appearances (best season) to be scored
+  min_ipouts: 10        # pitcher min IPouts (best season) to be scored
+  ballot_max_years: 10  # BBWAA ballot tenure that exhausts eligibility (VetCom scan)
+  vetcom_start: 1997    # first HOF ballot year scanned for VetCom-eligible players
+
+# Relative offsets (years back from `season`) that define the temporal split & cohorts.
+windows:
+  settled_lag: 15       # SETTLED_MAX      = season - settled_lag  (HOF outcome fully decided)
+  eligible_lag: 6       # ELIGIBLE_MAX_YR  = season - eligible_lag (BBWAA-eligible cohort cutoff)
+
+# League-leader qualification thresholds for the Bill James HOF Monitor (era break at 1961).
+qual:
+  pa: {pre_1961: 477.4, from_1961: 502.2}
+  ip: {pre_1961: 154,   from_1961: 162}
+
+seeds:
+  batter: 1123
+  pitcher: 420
+
+cohorts:
+  banned_ids: [rosepe01, jacksjo01]     # permanently ineligible (Rose, Jackson)
+  force_include_test: [ramirma02]       # forced into the scored/test set
+  force_include_ballot: [jonesan01]     # forced onto the ballot cohort
+
+model:
+  engine: xgbLinear     # xgbLinear (default/parity) | xgbTree | glmnet | rf
+  cv_folds: 10
+  imbalance: none       # none | scale_pos_weight | upweight | downsample   (Phase 6)
+  calibration: none     # none | platt | isotonic                            (Phase 6)
+  label: binary         # binary | multiclass_4                              (Phase 6)
+  committee: bbwaa      # bbwaa (default) | any_route  -> which electing body to model
+
+# BBWAA committee model (used when model.committee == bbwaa, the default). Predicts the
+# writers' vote from ballot history: projected vote share + P(elected this cycle)
+# + P(ever elected), via a share regressor and Monte-Carlo forward simulation.
+bbwaa:
+  engine: xgbTree       # tree booster handles the first-timer vs holdover regimes
+  n_sims: 2000          # Monte-Carlo simulations per candidate for the probabilities
+  elect_pct: 0.75       # ballot share required for election
+  survive_pct: 0.05     # ballot share required to stay on the ballot next year
+  resid_mode: conditional  # conditional (heteroscedastic noise by share, default) | global
+  use_ballot_strength: true  # Rule-of-10 crowding features (competitor_mass, n_cand, n_strong_competitors)
+  ballot_decay: 0.85         # per-year decay of competitor strength in the forward sim (logjam clears)
+
+  # Future-cycle ballot projection (Scripts/project_ballots.R). Derives the ballot
+  # for an unnamed cycle: first-time eligibles (retired 5 yrs, >=10 seasons, screened)
+  # + surviving holdovers (prior share in [survive_pct, elect_pct), within tenure).
+  project:
+    screen_war: 22       # first-timer screen: keep if career bWAR|JAWS|Monitor clears ANY threshold
+    screen_jaws: 22      #   (OR-screen; calibrated to reproduce real ~10-15/yr first-timer classes)
+    screen_hofm: 70      #   HOFM rescues elite closers/compilers a raw-WAR cut would drop
+    elected_rule: share  # carry-forward election rule for projected cycles: share (pred_share>=elect_pct) | prob (P_elected_cycle>0.5)
+    max_horizon: 2031    # hard ceiling for this snapshot = data_season + eligible_lag (first-timers must have finalGame <= data_season)
+
+paths:
+  data: Data
+  outputs: outputs

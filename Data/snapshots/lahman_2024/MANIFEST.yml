@@ -1,0 +1,113 @@
+snapshot: lahman_2024
+data_season: 2024
+built_at: '2026-07-08'
+n_tables: 27
+tables:
+  AllstarFull:
+    rows: 6344
+    max_year: 2024.0
+    md5: 05c008b9699f046b366d0765a7c1cd68
+  Appearances:
+    rows: 126828
+    max_year: 2024.0
+    md5: 2c0f25b750cb2f3684749e34cbe1b4ef
+  AwardsManagers:
+    rows: 228
+    max_year: 2024.0
+    md5: 60d123e2a4fca3507b8bd510c889b08c
+  AwardsPlayers:
+    rows: 12462
+    max_year: 2024.0
+    md5: 3d5b6b7136e70be0a1c229d5b3ffa50b
+  AwardsShareManagers:
+    rows: 526
+    max_year: 2024.0
+    md5: b5cd023d2c5c66424747f4ee41525819
+  AwardsSharePlayers:
+    rows: 7523
+    max_year: 2024.0
+    md5: 8db6ff0fc37af18cc7c9796e126e9847
+  Batting:
+    rows: 126907
+    max_year: 2024.0
+    md5: 92d7f67cd1e87866f04765518064b085
+  BattingPost:
+    rows: 18171
+    max_year: 2024.0
+    md5: 6086d730edbb02ac3f5ab51fd70a7d1c
+  CollegePlaying:
+    rows: 17687
+    max_year: 2014.0
+    md5: fb04d9b0f069707bd71e933a9a45370e
+  Fielding:
+    rows: 172088
+    max_year: 2024.0
+    md5: bf8daa2af08402c5a71c0388d446f92d
+  FieldingOF:
+    rows: 12028
+    max_year: 1955.0
+    md5: 969281acd4485f139fc191a01764df49
+  FieldingOFsplit:
+    rows: 44439
+    max_year: 2024.0
+    md5: dc20f406b40c923d0d4095ac34d9488c
+  FieldingPost:
+    rows: 17419
+    max_year: 2024.0
+    md5: e9eb5ceb15e1ea0018e468e77d6f3c51
+  HallOfFame:
+    rows: 6418
+    max_year: 2025.0
+    md5: 1afbb5176c198a9be15f3fd62e31d44b
+  HomeGames:
+    rows: 3270
+    max_year: .na
+    md5: 7b6d6da769a6a4860c4dad8b43615831
+  Managers:
+    rows: 4371
+    max_year: 2024.0
+    md5: 3ffdf29241be6601d58809cc3761afb9
+  ManagersHalf:
+    rows: 93
+    max_year: 1981.0
+    md5: f4ca15dcb69120d7e20f8cf42b7d3edc
+  Parks:
+    rows: 342
+    max_year: .na
+    md5: cfb88bf523383b430fa740483a485046
+  People:
+    rows: 24023
+    max_year: .na
+    md5: 384d8625afaf46da82557a62ad5e13bb
+  Pitching:
+    rows: 56615
+    max_year: 2024.0
+    md5: 56eac60ac1c6455dbc5edae6317d3836
+  PitchingPost:
+    rows: 7233
+    max_year: 2024.0
+    md5: 1632ff6743018c5c0cd366c1a6eef7d9
+  Salaries:
+    rows: 26428
+    max_year: 2016.0
+    md5: 2babf04e9e57d530811a7af2d9d027bf
+  Schools:
+    rows: 1284
+    max_year: .na
+    md5: 0c691835ca8071c494339dd382a33c40
+  SeriesPost:
+    rows: 429
+    max_year: 2024.0
+    md5: 7d4209ec626a8cc09bd6d63b96b62db1
+  Teams:
+    rows: 3584
+    max_year: 2024.0
+    md5: 9867456e1679f887cd2c999de4bf39a0
+  TeamsFranchises:
+    rows: 203
+    max_year: .na
+    md5: 260eddc2141d6b2ea0c7a582798f4383
+  TeamsHalf:
+    rows: 142
+    max_year: 1981.0
+    md5: ea3a5be588e40dc3e2920df2573f261e

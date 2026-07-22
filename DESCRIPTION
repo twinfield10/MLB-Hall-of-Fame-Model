@@ -1,0 +1,27 @@
+Package: mlbHofModel
+Title: MLB Hall of Fame Induction Model
+Version: 0.1.0
+Description: Reproducible pipeline that predicts a player's probability of
+    election to the Baseball Hall of Fame from historical Lahman data, plus
+    Baseball-Reference WAR. Config-driven and orchestrated with {targets}.
+Encoding: UTF-8
+Imports:
+    dplyr,
+    tidyr,
+    readr,
+    purrr,
+    magrittr,
+    stringr,
+    yaml,
+    targets,
+    Lahman,
+    caret,
+    xgboost,
+    glmnet,
+    randomForest,
+    doParallel,
+    gt,
+    mlbplotR,
+    scales
+Suggests:
+    testthat

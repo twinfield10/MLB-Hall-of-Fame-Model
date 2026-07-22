@@ -1,0 +1,12 @@
+'n': 5317
+n_pos: 80
+prevalence: 0.0150461
+roc_auc: 0.9937798
+pr_auc: 0.8773407
+log_loss: 0.0201856
+brier: 0.0047015
+precision_at_k: 0.8125
+sensitivity: 0.7375
+specificity: 0.9982815
+precision: 0.8676471
+f1: 0.7972973
